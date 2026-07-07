@@ -8,10 +8,11 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "astro": "^4.16.19",
     "@astrojs/node": "^8.3.4",
+    "@azure/storage-blob": "^12.32.0",
+    "@fontsource/inter": "^5.2.5",
     "@tailwindcss/vite": "^4.3.2",
-    "tailwindcss": "^4.3.2",
-    "@fontsource/inter": "^5.2.5"
+    "astro": "^4.16.19",
+    "tailwindcss": "^4.3.2"
   }
 }
