@@ -19,9 +19,14 @@ jobs:
         env:
           AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
           AZURE_STORAGE_CONTAINER: reports
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
+      - uses: azure/login@v2
         with:
-          app-name: app-tech-research-feed
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: website
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Deploy to Azure App Service
+        run: |
+          cd website
+          zip -r /tmp/deploy.zip . -x "node_modules/*" ".astro/*" "src/*"
+          az webapp deploy --resource-group rg-tech-research-feed \
+            --name app-tech-research-feed \
+            --src-path /tmp/deploy.zip \
+            --type zip
