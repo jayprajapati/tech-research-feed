@@ -1,17 +1,15 @@
 targetScope = 'resourceGroup'
 
 param location string = resourceGroup().location
-param storageSku string = 'Standard_LRS'
-param containerImageName string = 'trader-agent:latest'
+
+var suffix = uniqueString(resourceGroup().id)
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: 'st${uniqueString(resourceGroup().id)}'
+  name: 'st${suffix}'
   location: location
-  sku: { name: storageSku }
+  sku: { name: 'Standard_LRS' }
   kind: 'StorageV2'
-  properties: {
-    minimumTlsVersion: 'TLS1_2'
-  }
+  properties: { minimumTlsVersion: 'TLS1_2' }
 }
 
 resource reportsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
@@ -19,19 +17,27 @@ resource reportsContainer 'Microsoft.Storage/storageAccounts/blobServices/contai
 }
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-01-01' = {
-  name: 'cr${uniqueString(resourceGroup().id)}'
+  name: 'cr${suffix}'
   location: location
   sku: { name: 'Basic' }
   properties: { adminUserEnabled: true }
 }
 
 resource staticWebApp 'Microsoft.Web/staticSites@2022-09-01' = {
-  name: 'swa-trader-news'
+  name: 'swa-${suffix}'
   location: location
   sku: { name: 'Standard' }
   properties: {
-    repositoryUrl: ''
+    repositoryUrl: 'https://github.com/jayprajapati/tech-research-feed'
     branch: 'main'
-    buildProperties: { appLocation: 'website', outputLocation: 'dist' }
+    buildProperties: {
+      appLocation: 'website'
+      outputLocation: 'dist'
+    }
   }
 }
+
+output resourceGroupName string = resourceGroup().name
+output storageAccountName string = storage.name
+output containerRegistryName string = containerRegistry.name
+output staticWebAppName string = staticWebApp.name
