@@ -1,11 +1,4 @@
-import { BlobServiceClient } from '@azure/storage-blob';
-
-const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING!;
-const containerName = process.env.AZURE_STORAGE_CONTAINER || 'reports';
-
-const containerClient = BlobServiceClient
-  .fromConnectionString(connectionString)
-  .getContainerClient(containerName);
+import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
 
 interface ReportManifest {
   date: string;
@@ -41,17 +34,31 @@ interface Card {
   metrics: Record<string, string>;
 }
 
-async function downloadJson<T>(blobPath: string): Promise<T> {
-  const client = containerClient.getBlockBlobClient(blobPath);
+let _container: ContainerClient | null = null;
+
+function getContainer(): ContainerClient | null {
+  if (_container) return _container;
+  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!conn) return null;
+  _container = BlobServiceClient
+    .fromConnectionString(conn)
+    .getContainerClient(process.env.AZURE_STORAGE_CONTAINER || 'reports');
+  return _container;
+}
+
+async function downloadJson<T>(blobPath: string): Promise<T | null> {
+  const container = getContainer();
+  if (!container) return null;
+  const client = container.getBlockBlobClient(blobPath);
   const response = await client.downloadToBuffer();
   return JSON.parse(response.toString());
 }
 
 export async function getReportManifest(): Promise<ReportManifest[]> {
-  return downloadJson<ReportManifest[]>('index.json');
+  return (await downloadJson<ReportManifest[]>('index.json')) || [];
 }
 
-export async function getReport(date: string, slug: string): Promise<Report> {
+export async function getReport(date: string, slug: string): Promise<Report | null> {
   return downloadJson<Report>(`${date}/${slug}.json`);
 }
 

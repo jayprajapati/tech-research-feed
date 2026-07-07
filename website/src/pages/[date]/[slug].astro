@@ -8,8 +8,9 @@ let report;
 try {
   report = await getReport(date!, slug!);
 } catch {
-  return Astro.redirect('/404', 404);
+  report = null;
 }
+if (!report) return Astro.redirect('/404', 404);
 ---
 
 <BaseLayout title={report.title}>
