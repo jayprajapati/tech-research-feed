@@ -1,0 +1,33 @@
+---
+import { getAllTags } from '../lib/blob';
+
+const tags = await getAllTags();
+const currentType = Astro.url.searchParams.get('type') || '';
+const currentTag = Astro.url.searchParams.get('tag') || '';
+
+const types = [
+  { value: '', label: 'All Types' },
+  { value: 'daily-pulse', label: 'Daily Pulse' },
+  { value: 'weekly-review', label: 'Weekly Review' },
+  { value: 'swing-analysis', label: 'Swing Analysis' },
+  { value: 'portfolio-audit', label: 'Portfolio Audit' },
+];
+---
+
+<div class="flex flex-wrap gap-3 mb-8">
+  <select id="type-filter"
+          class="bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary"
+          onchange="const url = new URL(window.location.href); url.searchParams.set('type', this.value); window.location.href = url;">
+    {types.map(t => (
+      <option value={t.value} selected={t.value === currentType}>{t.label}</option>
+    ))}
+  </select>
+  <select id="tag-filter"
+          class="bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary"
+          onchange="const url = new URL(window.location.href); url.searchParams.set('tag', this.value); window.location.href = url;">
+    <option value="">All Tags</option>
+    {tags.map(tag => (
+      <option value={tag} selected={tag === currentTag}>{tag}</option>
+    ))}
+  </select>
+</div>

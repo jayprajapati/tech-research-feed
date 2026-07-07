@@ -1,10 +1,32 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import '../styles/global.css';
+import ReportCard from '../components/ReportCard.astro';
+import FilterBar from '../components/FilterBar.astro';
+import { getReportManifest } from '../lib/blob';
+
+const type = Astro.url.searchParams.get('type');
+const tag = Astro.url.searchParams.get('tag');
+
+let reports = await getReportManifest();
+
+if (type) reports = reports.filter(r => r.type === type);
+if (tag) reports = reports.filter(r => r.tags.includes(tag));
 ---
-<BaseLayout title="Home">
-  <main class="mx-auto max-w-4xl px-4 py-12">
-    <h1 class="text-3xl font-bold text-accent">Trader News</h1>
-    <p class="mt-4 text-text-muted">Daily trading research feed</p>
-  </main>
+
+<BaseLayout title="Feed">
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    <header class="mb-8">
+      <h1 class="text-2xl font-bold text-text-primary">Trader News</h1>
+      <p class="text-text-muted text-sm mt-1">Daily trading research feed</p>
+    </header>
+
+    <FilterBar />
+
+    <div class="space-y-4">
+      {reports.length === 0 && (
+        <p class="text-text-muted text-center py-12">No reports found.</p>
+      )}
+      {reports.map(report => <ReportCard report={report} />)}
+    </div>
+  </div>
 </BaseLayout>

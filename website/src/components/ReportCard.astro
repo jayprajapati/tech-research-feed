@@ -1,0 +1,40 @@
+---
+import type { ReportManifest } from '../lib/blob';
+
+export interface Props {
+  report: ReportManifest;
+}
+
+const { report } = Astro.props;
+
+const typeColors: Record<string, string> = {
+  'daily-pulse': 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  'weekly-review': 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+  'swing-analysis': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+  'portfolio-audit': 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+};
+
+const typeLabels: Record<string, string> = {
+  'daily-pulse': 'Daily Pulse',
+  'weekly-review': 'Weekly Review',
+  'swing-analysis': 'Swing Analysis',
+  'portfolio-audit': 'Portfolio Audit',
+};
+---
+
+<a href={`/${report.date}/${report.slug}`}
+   class="block bg-surface-2 border border-border rounded-xl p-5 hover:border-accent/50 transition-colors no-underline">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="text-xs font-semibold px-2.5 py-1 rounded-full border {typeColors[report.type]}">
+      {typeLabels[report.type]}
+    </span>
+    <span class="text-sm text-text-muted">{report.date}</span>
+  </div>
+  <h2 class="text-lg font-semibold text-text-primary mb-2">{report.title}</h2>
+  <p class="text-sm text-text-muted mb-3">{report.summary}</p>
+  <div class="flex flex-wrap gap-2">
+    {report.tags.map(tag => (
+      <span class="text-xs px-2 py-0.5 rounded bg-surface-3 text-text-muted">{tag}</span>
+    ))}
+  </div>
+</a>
