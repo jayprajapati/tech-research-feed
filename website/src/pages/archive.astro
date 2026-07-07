@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getReportManifest } from '../lib/blob';
+
+const reports = await getReportManifest();
+const byMonth: Record<string, typeof reports> = {};
+
+for (const r of reports) {
+  const month = r.date.slice(0, 7);
+  (byMonth[month] ??= []).push(r);
+}
+---
+
+<BaseLayout title="Archive">
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    <a href="/" class="inline-flex items-center gap-1 text-sm text-accent hover:text-accent-muted mb-6 no-underline">
+      ← Feed
+    </a>
+    <h1 class="text-2xl font-bold text-text-primary mb-8">Archive</h1>
+
+    {Object.entries(byMonth).sort(([a], [b]) => b.localeCompare(a)).map(([month, mReports]) => (
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-text-primary mb-3">{month}</h2>
+        <div class="space-y-2">
+          {mReports.map(r => (
+            <a href={`/${r.date}/${r.slug}`}
+               class="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-surface-2 transition-colors no-underline">
+              <span class="text-xs text-text-muted w-24">{r.date}</span>
+              <span class="text-sm font-medium text-text-primary">{r.title}</span>
+              <span class="text-xs text-text-muted">{r.type.replace('-', ' ')}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+</BaseLayout>

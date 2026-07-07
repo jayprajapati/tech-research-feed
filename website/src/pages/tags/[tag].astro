@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ReportCard from '../../components/ReportCard.astro';
+import { getReportManifest } from '../../lib/blob';
+
+const { tag } = Astro.params;
+const reports = (await getReportManifest()).filter(r => r.tags.includes(tag!));
+---
+
+<BaseLayout title={`#${tag}`}>
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    <a href="/" class="inline-flex items-center gap-1 text-sm text-accent hover:text-accent-muted mb-6 no-underline">
+      ← Feed
+    </a>
+    <h1 class="text-2xl font-bold text-text-primary mb-2">#{tag}</h1>
+    <p class="text-text-muted text-sm mb-8">{reports.length} report(s)</p>
+    <div class="space-y-4">
+      {reports.map(r => <ReportCard report={r} />)}
+    </div>
+  </div>
+</BaseLayout>
