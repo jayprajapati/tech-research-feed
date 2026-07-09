@@ -2,6 +2,7 @@ import os
 import json
 import re
 import httpx
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime
 from openai import OpenAI
 from schema import Report, Section, Table, Card
@@ -60,6 +61,60 @@ def get_market_data() -> dict:
     return data
 
 
+STOCKS = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
+    "HINDUNILVR.NS", "ITC.NS", "SBIN.NS", "BHARTIARTL.NS", "KOTAKBANK.NS",
+    "BAJFINANCE.NS", "LT.NS", "WIPRO.NS", "TITAN.NS", "AXISBANK.NS",
+    "MARUTI.NS", "SUNPHARMA.NS", "NTPC.NS", "ONGC.NS", "POWERGRID.NS",
+    "NESTLEIND.NS", "ULTRACEMCO.NS", "HCLTECH.NS", "TATAMOTORS.NS", "M&M.NS",
+    "BAJAJFINSV.NS", "TATASTEEL.NS", "JSWSTEEL.NS", "HINDALCO.NS", "COALINDIA.NS",
+    "ADANIPORTS.NS", "ADANIENT.NS", "GRASIM.NS", "EICHERMOT.NS", "CIPLA.NS",
+    "BRITANNIA.NS", "DRREDDY.NS", "HDFCLIFE.NS", "SBILIFE.NS", "ASIANPAINT.NS",
+    "TRENT.NS", "BAJAJHLDNG.NS", "DIVISLAB.NS", "APOLLOHOSP.NS", "HEROMOTOCO.NS",
+    "BEL.NS", "HAL.NS", "PIDILITIND.NS", "DABUR.NS", "ICICIPRULI.NS",
+]
+
+
+def scan_stocks(concurrent: int = 15) -> dict:
+    def fetch(sym):
+        d = fetch_json(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}")
+        try:
+            m = d["chart"]["result"][0]["meta"]
+            return {
+                "symbol": sym.replace(".NS", ""),
+                "price": m.get("regularMarketPrice"),
+                "high52w": m.get("fiftyTwoWeekHigh"),
+                "low52w": m.get("fiftyTwoWeekLow"),
+                "volume": m.get("regularMarketVolume"),
+                "prev_close": m.get("chartPreviousClose") or m.get("previousClose"),
+            }
+        except Exception:
+            return None
+
+    results = []
+    with ThreadPoolExecutor(max_workers=concurrent) as pool:
+        fut = {pool.submit(fetch, sym): sym for sym in STOCKS}
+        for f in as_completed(fut):
+            r = f.result()
+            if r:
+                results.append(r)
+
+    def pct_from(v, ref):
+        return round(((v - ref) / ref) * 100, 2) if v and ref else None
+
+    for r in results:
+        r["from_high_pct"] = pct_from(r["price"], r["high52w"])
+        r["from_low_pct"] = pct_from(r["price"], r["low52w"])
+        del r["prev_close"]
+
+    near_high = [r for r in results if r["from_high_pct"] is not None and r["from_high_pct"] >= -5]
+    near_low = [r for r in results if r["from_low_pct"] is not None and r["from_low_pct"] <= 5 and r["from_high_pct"] < -5]
+    near_high.sort(key=lambda x: x["from_high_pct"], reverse=True)
+    near_low.sort(key=lambda x: x["from_low_pct"])
+
+    return {"near_52wk_high": near_high[:8], "near_52wk_low": near_low[:5]}
+
+
 SYSTEM_PROMPT = """You are an Institutional Swing Trader and Quantitative Portfolio Strategist for Indian Equity Markets (NSE). Generate a structured daily market report.
 
 Live market data (indices with prices and % changes) is provided. Use it with your training knowledge of recent market patterns, sector rotation, FII/DII trends, and catalysts.
@@ -72,7 +127,7 @@ Required sections (in this order):
 
 2. Sectoral Heatmap — table ranking all sectors by % change (top to bottom). Identify top 3 sectors with capital rotation INTO, bottom 3 with capital rotation OUT OF. Note any sector showing reversal signals. Include cap-size rotation (Midcap/Smallcap vs Nifty 50).
 
-3. 52-Week High/Low Scan — cards with stock names near 52-week highs or lows, filtered by volume and delivery criteria. Use your training knowledge of recent breakout stocks. Rate as Tier 1 (high conviction), Tier 2 (good setup), or Tier 3 (conditional based on sector confirmation).
+3. 52-Week High/Low Scan — cards with stock names from the provided live scan data. For each: price, distance from 52w high (%), volume. Rate as Tier 1 (within 2% of 52w high + sector tailwind), Tier 2 (within 5% of 52w high), or Tier 3 (near 52w low showing reversal potential + volume confirmation).
 
 4. Swing Trade Picks — cards with specific entries:
    - Each pick: name, tier, entry zone, stop-loss, target, rationale, R:R ratio
@@ -147,12 +202,13 @@ IMPORTANT: Return ONLY valid JSON. No markdown wrapping or explanation."""
 def generate_report(report_type: str, report_date: str | None = None) -> Report:
     today = report_date or date.today().isoformat()
     market_data = get_market_data()
+    fifty_two_scan = scan_stocks()
 
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Generate a {report_type} report for {today}.\n\nLive Market Data:\n{json.dumps(market_data, indent=2)}"},
+            {"role": "user", "content": f"Generate a {report_type} report for {today}.\n\nLive Market Data (indices):\n{json.dumps(market_data, indent=2)}\n\n52-Week High/Low Stock Scan (live from Yahoo Finance):\n{json.dumps(fifty_two_scan, indent=2)}"},
         ],
     )
 
