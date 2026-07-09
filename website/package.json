@@ -2,18 +2,7 @@
   "name": "trader-news",
   "type": "module",
   "version": "0.0.1",
-  "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "start": "node ./dist/server/entry.mjs"
-  },
   "dependencies": {
-    "@astrojs/node": "^8.3.4",
-    "@azure/storage-blob": "^12.32.0",
-    "@fontsource/inter": "^5.2.5",
-    "@tailwindcss/vite": "^4.3.2",
-    "astro": "^4.16.19",
-    "tailwindcss": "^4.3.2"
+    "@azure/storage-blob": "^12.32.0"
   }
 }

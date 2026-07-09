@@ -1,4 +1,4 @@
-import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
+import { BlobServiceClient } from '@azure/storage-blob';
 
 interface ReportManifest {
   date: string;
