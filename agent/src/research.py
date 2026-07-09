@@ -25,51 +25,123 @@ def fetch_json(url: str) -> dict | list:
         return {"error": str(e)}
 
 
-def get_market_data() -> dict:
-    nifty = fetch_json("https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI")
-    banknifty = fetch_json("https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEBANK")
-    sensex = fetch_json("https://query1.finance.yahoo.com/v8/finance/chart/%5EBSESN")
+SECTORS = [
+    ("nifty_it", "%5ECNXIT"),
+    ("nifty_pharma", "%5ECNXPHARMA"),
+    ("nifty_auto", "%5ECNXAUTO"),
+    ("nifty_fmcg", "%5ECNXFMCG"),
+    ("nifty_metal", "%5ECNXMETAL"),
+    ("nifty_realty", "%5ECNXREALTY"),
+    ("nifty_media", "%5ECNXMEDIA"),
+    ("nifty_energy", "%5ECNXENERGY"),
+    ("nifty_infra", "%5ECNXINFRA"),
+]
 
-    def price(d):
+
+def get_market_data() -> dict:
+    def price_and_change(d):
         try:
-            return d["chart"]["result"][0]["meta"]["regularMarketPrice"]
+            meta = d["chart"]["result"][0]["meta"]
+            p = meta["regularMarketPrice"]
+            pc = meta.get("chartPreviousClose") or meta.get("previousClose")
+            return {"price": p, "change_pct": round(((p - pc) / pc) * 100, 2) if pc else None}
         except Exception:
             return None
 
-    return {
-        "nifty": price(nifty),
-        "bank_nifty": price(banknifty),
-        "sensex": price(sensex),
-    }
+    data = {}
+    for name, sym in [("nifty", "%5ENSEI"), ("bank_nifty", "%5ENSEBANK"), ("sensex", "%5EBSESN")]:
+        d = fetch_json(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}")
+        data[name] = price_and_change(d)
+
+    for name, sym in SECTORS:
+        d = fetch_json(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}")
+        data[name] = price_and_change(d)
+
+    return data
 
 
-SYSTEM_PROMPT = """You are a professional equity research analyst specializing in Indian markets (NSE).
-Your task is to generate a structured daily market report.
+SYSTEM_PROMPT = """You are an Institutional Swing Trader and Quantitative Portfolio Strategist for Indian Equity Markets (NSE). Generate a structured daily market report.
 
-Live market data (Nifty, Bank Nifty, Sensex levels) is provided in the user message.
-Use it along with your training knowledge of recent market patterns, sector rotation,
-FII/DII trends, and catalysts to build a comprehensive report.
+Live market data (indices with prices and % changes) is provided. Use it with your training knowledge of recent market patterns, sector rotation, FII/DII trends, and catalysts.
 
-Output a JSON report following this schema:
+Output a JSON report following this schema. The "type" field for sections can be "text" (simple paragraph), "table" (structured with headers/rows), or "cards" (list of items with name/reasoning/metrics). For stock recommendations use "cards" type.
+
+Required sections (in this order):
+
+1. Market Context — Nifty/Bank Nifty/Sensex levels, trend (above/below 20 EMA), weekly change, FII/DII flow summary, key macro catalysts.
+
+2. Sectoral Heatmap — table ranking all sectors by % change (top to bottom). Identify top 3 sectors with capital rotation INTO, bottom 3 with capital rotation OUT OF. Note any sector showing reversal signals. Include cap-size rotation (Midcap/Smallcap vs Nifty 50).
+
+3. 52-Week High/Low Scan — cards with stock names near 52-week highs or lows, filtered by volume and delivery criteria. Use your training knowledge of recent breakout stocks. Rate as Tier 1 (high conviction), Tier 2 (good setup), or Tier 3 (conditional based on sector confirmation).
+
+4. Swing Trade Picks — cards with specific entries:
+   - Each pick: name, tier, entry zone, stop-loss, target, rationale, R:R ratio
+   - Max 4-5 picks. Each max 10-12% position sizing.
+   - Include time-stop rule (exit if flat after 3-4 sessions).
+   - Never pick stocks in structural downtrend.
+
+5. Technical Outlook — key support/resistance levels for Nifty, Bank Nifty. Market kill-switch level (Nifty below key support = reduce exposure). RSI, trend indicators.
+
+JSON schema:
 {
   "date": "YYYY-MM-DD",
   "type": "daily-pulse",
-  "title": "string",
-  "tags": ["nifty", "fii-dii"],
-  "summary": "2-3 sentence overview",
+  "title": "concise title",
+  "tags": ["nifty", "fii-dii", "sector-rotation"],
+  "summary": "2-3 sentence overview with key takeaway",
   "slug": "daily-pulse",
   "sections": [
     {
       "heading": "Market Context",
-      "content": "text string or table or list of cards",
-      "type": "text|table|cards|ranking"
+      "content": "paragraph text",
+      "type": "text"
+    },
+    {
+      "heading": "Sectoral Heatmap",
+      "content": {
+        "headers": ["Sector", "Change %", "Trend"],
+        "rows": [["Nifty IT", "+1.2", "Bullish"], ["Nifty Pharma", "-0.3", "Neutral"]],
+        "caption": "Sectors ranked by performance with rotation commentary"
+      },
+      "type": "table"
+    },
+    {
+      "heading": "52-Week High/Low Scan",
+      "content": [
+        {"name": "Stock Name", "tier": "Tier 1", "reasoning": "Breakout with 2x volume, sector tailwind", "metrics": {"Price": "2450", "Volume": "2.5x avg", "Delivery": "62%", "52W High": "2480"}},
+        {"name": "Stock Name", "tier": "Tier 2", "reasoning": "Good setup, needs sector confirmation", "metrics": {"Price": "890", "Volume": "1.8x avg", "Delivery": "55%"}}
+      ],
+      "type": "cards"
+    },
+    {
+      "heading": "Swing Trade Picks",
+      "content": [
+        {"name": "Stock Name", "tier": "Tier 1", "reasoning": "Strong breakout, sector tailwind, institutional accumulation. Entry 2450-2470, SL 2380, T1 2550 T2 2620. R:R 1:2.1", "metrics": {"Entry": "2450-2470", "Stop Loss": "2380", "Target 1": "2550", "Target 2": "2620", "R:R": "1:2.1"}},
+        {"name": "Stock Name 2", "tier": "Tier 2", "reasoning": "Base breakout, needs volume confirmation. Entry 890-900, SL 865, T1 940.", "metrics": {"Entry": "890-900", "Stop Loss": "865", "Target": "940", "R:R": "1:1.8"}}
+      ],
+      "type": "cards"
+    },
+    {
+      "heading": "Technical Outlook",
+      "content": "Nifty support 23800, resistance 24200. RSI 58, room for upside. Market kill-switch: close below 23600 reduce 50%.",
+      "type": "text"
     }
   ],
   "generatedAt": "ISO timestamp",
   "model": "string"
 }
 
-IMPORTANT: Return ONLY valid JSON. No markdown wrapping, no explanation."""
+Trading Rules (NEVER violate):
+- R:R minimum 1:2. No exceptions.
+- Position sizing: max 10-12% per trade.
+- Hard stop-loss. No averaging down.
+- Time-stop: exit if flat after 3-4 days.
+- No earnings gambles — exit before Q results.
+- Max 2-3 stocks from same sector.
+- Volume confirmation: >1.5x avg weekly volume for breakouts.
+- Only buy above 20 EMA or Stage 1 breakout.
+
+IMPORTANT: Return ONLY valid JSON. No markdown wrapping or explanation."""
 
 
 def generate_report(report_type: str, report_date: str | None = None) -> Report:
