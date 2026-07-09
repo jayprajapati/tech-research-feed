@@ -213,21 +213,16 @@ def generate_report(report_type: str, report_date: str | None = None) -> Report:
     )
 
     raw = response.choices[0].message.content
-    # robust JSON extraction: brace-counting
-    start = raw.index("{")
-    depth = 0
-    for i in range(start, len(raw)):
-        if raw[i] == "{": depth += 1
-        elif raw[i] == "}": depth -= 1
-        if depth == 0:
-            raw = raw[start:i+1]
-            break
     try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
+        decoder = json.JSONDecoder()
+        start = raw.index("{")
+        data, _ = decoder.raw_decode(raw, start)
+    except (json.JSONDecodeError, ValueError):
         raw = raw.replace("'", '"').replace("True","true").replace("False","false").replace("None","null")
-        raw = re.sub(r",\s*}", "}", raw).replace("\t", " ")
-        data = json.loads(raw)
+        raw = re.sub(r",\s*}", "}", raw)
+        decoder = json.JSONDecoder()
+        start = raw.index("{")
+        data, _ = decoder.raw_decode(raw, start)
     data["date"] = today
     data["slug"] = report_type
     data["generatedAt"] = datetime.utcnow().isoformat() + "Z"
